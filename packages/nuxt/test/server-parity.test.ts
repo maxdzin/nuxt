@@ -56,6 +56,7 @@ interface FourXSurface {
   deriveSecret: (purpose: string) => Promise<string>
   getRouterParams: (event: RequestEvent, options?: { decode?: boolean }) => Record<string, string | undefined>
   getRouterParam: (event: RequestEvent, name: string, options?: { decode?: boolean }) => string | undefined
+  getValidatedRouterParams: <Output>(event: RequestEvent, validate: (data: unknown) => ValidateResult<Output>) => Promise<Output>
   getRequestIP: (event: RequestEvent, options?: { xForwardedFor?: boolean }) => string | undefined
   getValidatedQuery: <Output>(event: RequestEvent, validate: (data: Record<string, string | string[]>) => ValidateResult<Output>) => Promise<Output>
   readValidatedBody: <Output>(event: RequestEvent, validate: (data: unknown) => ValidateResult<Output>) => Promise<Output>
@@ -91,6 +92,7 @@ const FOURX_VALUE_EXPORTS = [
   'getRouterParam',
   'getRequestIP',
   'getValidatedQuery',
+  'getValidatedRouterParams',
   'readValidatedBody',
   'handleCors',
   'useAppConfig',

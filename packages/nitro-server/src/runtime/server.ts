@@ -32,6 +32,7 @@ export {
   getRequestURL,
   getRouterParam,
   getRouterParams,
+  getValidatedRouterParams,
   getValidatedQuery,
   handleCors,
   readBody,

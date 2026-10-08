@@ -1,6 +1,6 @@
 import type { RequestEvent } from 'nuxt/schema'
 
-import { createError, getQuery, isNuxtError, readBody } from './index'
+import { createError, getQuery, getRouterParams, isNuxtError, readBody } from './index'
 import type { NuxtErrorDetails } from '../app/error'
 
 /** A validation failure, as a Standard Schema reports it. */
@@ -75,6 +75,30 @@ function createValidationError (cause: unknown) {
       message: cause instanceof Error ? VALIDATION_FAILED : details?.message || VALIDATION_FAILED,
     },
   })
+}
+
+/**
+ * Read the route parameters of the request as {@link getRouterParams} does,
+ * validated with a Standard Schema or a validator function. Invalid input is
+ * rejected with a `400` whose `data` carries the issues, unless `onError`
+ * returns a different error.
+ *
+ * @example
+ * ```ts
+ * import { z } from 'zod'
+ *
+ * export default defineEventHandler(async (event) => {
+ *   const { id } = await getValidatedRouterParams(event, z.object({ id: z.coerce.number() }))
+ *   return { id }
+ * })
+ * ```
+ *
+ * @since 4.6.0
+ */
+export function getValidatedRouterParams<S extends StandardSchema> (event: Pick<RequestEvent, 'context'>, validate: S, options?: ValidateOptions): Promise<SchemaOutput<S>>
+export function getValidatedRouterParams<Output> (event: Pick<RequestEvent, 'context'>, validate: (data: unknown) => ValidateResult<Output> | Promise<ValidateResult<Output>>, options?: ValidateOptions): Promise<Output>
+export function getValidatedRouterParams (event: Pick<RequestEvent, 'context'>, validate: Validator<any, unknown>, options?: ValidateOptions): Promise<unknown> {
+  return validateData(getRouterParams(event, { decode: true }), validate, options)
 }
 
 /**

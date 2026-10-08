@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 
-import { getValidatedQuery, readValidatedBody } from '../src/server/index'
+import { getValidatedQuery, getValidatedRouterParams, readValidatedBody } from '../src/server/index'
 import type { RequestEvent } from '../src/server/index'
 
 function event (request: Request): RequestEvent {
@@ -79,5 +79,58 @@ describe('`getValidatedQuery`', () => {
       return Number(query.page)
     })
     expect(page).toBe(2)
+  })
+})
+
+describe('`getValidatedRouterParams`', () => {
+  function routedEvent (params?: Record<string, string | undefined>): RequestEvent {
+    const e = event(new Request('https://nuxt.com/api'))
+    return { ...e, context: { params } }
+  }
+
+  it('resolves the output of a Standard Schema', async () => {
+    const e = routedEvent({ name: 'nuxt' })
+    const params = await getValidatedRouterParams(e, named)
+    expectTypeOf(params).toEqualTypeOf<{ name: string }>()
+    expect(params).toEqual({ name: 'NUXT' })
+  })
+
+  it.for<[string, () => unknown, unknown]>([
+    ['the value it returns', () => ({ ok: 1 }), { ok: 1 }],
+    ['the input for `true`', () => true, { name: 'nuxt' }],
+    ['the input for nothing', () => {}, { name: 'nuxt' }],
+  ])('resolves %s from a validator function', async ([, validate, expected]) => {
+    const e = routedEvent({ name: 'nuxt' })
+    await expect(getValidatedRouterParams(e, validate)).resolves.toEqual(expected)
+  })
+
+  it('rejects input a Standard Schema fails with a 400 carrying the issues', async () => {
+    const e = routedEvent()
+    await expect(getValidatedRouterParams(e, named)).rejects.toMatchObject({
+      status: 400,
+      statusText: 'Validation failed',
+      data: { message: 'Validation failed', issues: [{ message: 'name is required', path: ['name'] }] },
+    })
+  })
+
+  it('rejects with the error `onError` describes', async () => {
+    const e = routedEvent()
+    await expect(getValidatedRouterParams(e, named, { onError: ({ issues }) => ({ status: 422, message: issues[0]!.message }) }))
+      .rejects.toMatchObject({ status: 422, message: 'name is required' })
+  })
+
+  it('rejects input a validator function refuses', async () => {
+    const e = routedEvent()
+    await expect(getValidatedRouterParams(e, () => false)).rejects.toMatchObject({ status: 400, statusText: 'Validation failed' })
+  })
+
+  it('rejects with the message a validator function throws, keeping an HTTP error as it is', async () => {
+    const e = routedEvent()
+    await expect(getValidatedRouterParams(e, () => {
+      throw new Error('bad name')
+    })).rejects.toMatchObject({ status: 400, message: 'bad name', data: { message: 'Validation failed' } })
+    await expect(getValidatedRouterParams(e, () => {
+      throw Object.assign(new Error('gone'), { name: 'HTTPError', status: 410 })
+    })).rejects.toMatchObject({ status: 410, message: 'gone' })
   })
 })
